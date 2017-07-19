@@ -2,3 +2,7 @@ node_modules
 .plan
 .env
 yarn.lock
+/bin/bzip2.exe
+/bin/plink.exe
+/bin/pscp.exe
+/bin/bzip2.dll

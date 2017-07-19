@@ -1,7 +1,8 @@
 {
   "dependencies": {
-    "dotenv": "^4.0.0",
-    "node-watch": "^0.5.5",
-    "tmp": "^0.0.31"
+    "async": "^2.5.0",
+    "minimist": "^1.2.0",
+    "mkdirp": "^0.5.1",
+    "srcds-rcon": "^2.2.1"
   }
 }

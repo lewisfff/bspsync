@@ -1,5 +1,22 @@
 # bspsync
-Automated testing pipeline script for Source maps
+Automated pipeline for iterative public map testing.
+
+### Usage
+```
+> node bspsync.js --watch "d:/cstrike/maps" fy_aixxe.bsp
+versioning map 'fy_aixxe' to 'fy_aixxe_v1'..
+compressing 'fy_aixxe_v1.bsp' for fastdl..
+uploading 'fy_aixxe_v1.bsp.bz2' to remote server..
+remotely extracting 'fy_aixxe_v1.bsp.bz2' to game server..
+changing level on remote game server..
+```
+
+### Requirements
+
+You will need to place the following files in the 'bin' directory.
+* [bzip2.exe](http://gnuwin32.sourceforge.net/downlinks/bzip2-bin-zip.php)
+* [plink.exe](https://the.earth.li/~sgtatham/putty/latest/w32/plink.exe)
+* [pscp.exe](https://the.earth.li/~sgtatham/putty/latest/w32/pscp.exe)
 
 ### Problem
 
