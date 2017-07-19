@@ -1,2 +1,4 @@
 node_modules
 .plan
+.env
+yarn.lock
