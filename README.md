@@ -1,11 +1,11 @@
-# bsptest
+# bspsync
 Automated testing pipeline script for Source maps
 
 ### Problem
 
 I want to test my maps on a remote SRCDS server with the following setup:
 
-- [ ] Automatically watch BSP file(s) for changes
+- [ ] Watch BSP file(s) for changes recursively
 - [ ] Packed map resources
 - [ ] Unique map name (serverside only)
 - [ ] bz2 compression for FastDL
