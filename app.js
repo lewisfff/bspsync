@@ -1,5 +1,5 @@
 /*
-	
+
 	bspsync - Automated pipeline for iterative public map testing.
 	Copyright (C) 2017, aixxe. <aixxe@skyenet.org>
 
@@ -10,17 +10,18 @@
 	it under the terms of the GNU General Public License as published by
 	the Free Software Foundation; either version 2 of the License, or
 	(at your option) any later version.
-	
+
 	This program is distributed in the hope that it will be useful,
 	but WITHOUT ANY WARRANTY; without even the implied warranty of
 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 	GNU General Public License for more details.
-	
+
 	You should have received a copy of the GNU General Public License
 	along with bspsync. If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+require('dotenv').config()
 const fs = require('fs');
 const path = require('path');
 const async = require('async');
@@ -47,27 +48,27 @@ const output_folder = argv.output ? argv.output: argv.watch;
 
 // Where to upload the final map file. (requires SFTP!)
 const output_server = {
-	address: 'your.server',
+	address: process.env.REMOTE_ADDR,
 	port: 22,
-	username: 'srcds',
+	username: process.env.REMOTE_USER,
 	password: '',
 	private_key: {
 		// PuTTY format key -- no passphrase support yet but might work with Pageant.
-		filename: 'C:/Users/Administrator/.ssh/id_rsa.ppk'
+		filename: process.env.PRIVKEY
 	},
 	// Unfortunately, this IS required. (just run 'plink.exe <server host>' to get this)
-	hostkey: 'c8:40:32:e2:f7:4a:c9:76:d4:fb:02:e8:b8:5b:80:e7',
+	hostkey: process.env.HOSTKEY,
 	paths: {
 		// Absolute path to place the '.bsp.bz2' files in.
-		fastdl: '/home/http/fastdl.your.server/public/cstrike/maps',
+		fastdl: process.env.REMOTE_FASTDL_DIR,
 		// Absolute path to place the '.bsp' files in.
-		maps: '/home/srcds/cstrike/maps'
+		maps: process.env.REMOTE_MAP_DIR
 	},
 	// When enabled, automatically runs 'changelevel' after the map has been extracted.
 	rcon: {
 		enabled: true,
-		address: 'your.server',
-		password: 'rcon123'
+		address: process.env.REMOTE_ADDR,
+		password: process.env.RCON_PASS
 	}
 };
 
@@ -90,7 +91,7 @@ var getNextVersion = (basename, folder, callback) => {
 			return callback(new Error('failed to read files from map directory.'));
 
 		let ideal_version = 1;
-		let version_regex = /_v(\d+).bsp/g;
+		let version_regex = /_dev(\d+).bsp/g;
 
 		for (var i = files.length - 1; i >= 0; i--) {
 			if (!files[i].toLowerCase().startsWith(basename))
@@ -115,7 +116,7 @@ var getNextVersion = (basename, folder, callback) => {
 var bspsync = async.queue((task, callback) => {
 	// Get the metadata for this map file.
 	let watch_file = watch_files[task.file];
-	
+
 	// Resolve the absolute path on the filesystem to the input map file.
 	let input_file = path.resolve(watch_folder + path.sep + task.file);
 	let input_basename = path.parse(input_file).name;
@@ -126,14 +127,14 @@ var bspsync = async.queue((task, callback) => {
 			return callback(new Error('failed to get next map version.'));
 
 		// Shorter versions of the final map name.
-		let output_basename = input_basename + '_v' + version;
+		let output_basename = input_basename + '_dev' + version;
 		let output_filename = output_basename + '.bsp';
 
 		// Full path to final map file on disk.
 		let output_file = path.resolve(output_folder + path.sep + output_filename);
 
 		console.log(`versioning map '${input_basename}' to '${output_basename}'..`);
-		
+
 		// Version the original map by moving it to the output folder.
 		fs.rename(input_file, output_file, error => {
 			if (error)
@@ -144,7 +145,7 @@ var bspsync = async.queue((task, callback) => {
 			child_process.spawn(bin_folder.concat('bzip2.exe'), ['-z9', '-k', output_file], {cwd: bin_folder}).on('close', code => {
 				if (code !== 0)
 					return callback(new Error('failed to compress map.'));
-				
+
 				// Build the arguments for invoking pscp.
 				let pscp_arguments = ['-batch', '-P', output_server.port, '-q', '-hostkey', output_server.hostkey];
 
@@ -155,7 +156,7 @@ var bspsync = async.queue((task, callback) => {
 					pscp_arguments.push('-i', output_server.private_key.filename);
 
 				pscp_arguments.push(output_file + '.bz2', `${output_server.username}@${output_server.address}:${output_server.paths.fastdl}`);
-				
+
 				// Upload the compressed map to the FastDL location with pscp.
 				let pscp = child_process.spawn(bin_folder.concat('pscp.exe'), pscp_arguments, {cwd: bin_folder});
 
@@ -164,7 +165,7 @@ var bspsync = async.queue((task, callback) => {
 				pscp.on('close', code => {
 					if (code !== 0)
 						return callback(new Error('failed to upload compressed map file to server.'));
-					
+
 					// Build the arguments for invoking plink.
 					let plink_arguments = ['-ssh', '-batch', '-P', output_server.port, '-hostkey', output_server.hostkey];
 
@@ -173,7 +174,7 @@ var bspsync = async.queue((task, callback) => {
 
 					if (output_server.private_key.filename.length)
 						plink_arguments.push('-i', output_server.private_key.filename);
-					
+
 					plink_arguments.push(`${output_server.username}@${output_server.address}`);
 					plink_arguments.push(`bunzip2 -k -c "${output_server.paths.fastdl}/${output_basename}.bsp.bz2" > "${output_server.paths.maps}/${output_basename}.bsp"`);
 
@@ -226,10 +227,10 @@ fs.watch(watch_folder, (event, filename) => {
 	if (watch_file.last_active !== 0)
 		if (Date.now() - watch_file.last_active < 100)
 			return false;
-	
+
 	// Update the 'last modified' time for this map.
 	watch_file.last_active = Date.now();
-	
+
 	// Queue for uploading.
 	let start_time = Date.now();
 
