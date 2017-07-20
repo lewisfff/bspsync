@@ -49,7 +49,7 @@ const output_folder = argv.output ? argv.output: argv.watch;
 // Where to upload the final map file. (requires SFTP!)
 const output_server = {
 	address: process.env.REMOTE_ADDR,
-	port: 22,
+	port: process.env.REMOTE_PORT,
 	username: process.env.REMOTE_USER,
 	password: '',
 	private_key: {
