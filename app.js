@@ -72,6 +72,12 @@ const output_server = {
 	}
 };
 
+const bspzip_path = process.env.BSPZIP_PATH.concat(path.sep + 'bspzip.exe');
+const bspzip_resfile = process.env.BSPZIP_RESFILE;
+
+if (!fs.existsSync(bspzip_path))
+	console.error(`fatal error: '${bspzip_path}' is missing.`);
+
 // Ensure all the required external dependencies exist.
 const bin_folder = path.resolve('./bin').concat(path.sep);
 
@@ -139,6 +145,13 @@ var bspsync = async.queue((task, callback) => {
 		fs.rename(input_file, output_file, error => {
 			if (error)
 				return callback(new Error('failed to move map to output directory.'));
+
+			console.log(`packing textures into '${output_filename}..'`);
+
+			child_process.spawn(bspzip_path, ['-addlist', output_file, bspzip_resfile, output_file], {cwd: bin_folder}).on('close', code => {
+				if (code !== 0)
+					return callback(new Error('failed to pack map textures'));
+			});
 
 			console.log(`compressing '${output_filename}' for fastdl..`);
 
