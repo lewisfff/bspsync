@@ -30,6 +30,8 @@ const rcon = require('srcds-rcon');
 const child_process = require('child_process');
 const argv = require('minimist')(process.argv.slice(2));
 
+const noisy_logging = false;
+
 // Pull maps to watch from command line arguments.
 const watch_files = {};
 
@@ -42,6 +44,9 @@ argv['_'].forEach(value => {
 
 // Watch this folder for changes in the above .bsp files. Can be the same as the output folder.
 const watch_folder = argv.watch;
+
+// Use quickpack.py in ./bin to pack custom resources
+const use_quickpack = argv['quickpack'] === true;
 
 // The final versioned map file will be moved to this folder.
 const output_folder = argv.output ? argv.output: argv.watch;
@@ -72,12 +77,6 @@ const output_server = {
 	}
 };
 
-const bspzip_path = process.env.BSPZIP_PATH.concat(path.sep + 'bspzip.exe');
-const bspzip_resfile = process.env.BSPZIP_RESFILE;
-
-if (!fs.existsSync(bspzip_path))
-	console.error(`fatal error: '${bspzip_path}' is missing.`);
-
 // Ensure all the required external dependencies exist.
 const bin_folder = path.resolve('./bin').concat(path.sep);
 
@@ -87,6 +86,11 @@ const bin_folder = path.resolve('./bin').concat(path.sep);
 	if (!fs.existsSync(filename))
 		return console.error(`fatal error: '${filename}' is missing.`);
 });
+
+if (use_quickpack) {
+	if (!fs.existsSync(bin_folder.concat('QuickPack.py')))
+		return console.error('fatal error: QuickPack.py is missing.');
+}
 
 // Determine the next version of the map. (increments largest existing version)
 var getNextVersion = (basename, folder, callback) => {
@@ -146,12 +150,26 @@ var bspsync = async.queue((task, callback) => {
 			if (error)
 				return callback(new Error('failed to move map to output directory.'));
 
-			console.log(`packing textures into '${output_filename}..'`);
+			if (use_quickpack) {
+				console.log(`packing resources into '${output_filename}..'`);
 
-			child_process.spawn(bspzip_path, ['-addlist', output_file, bspzip_resfile, output_file], {cwd: bin_folder}).on('close', code => {
-				if (code !== 0)
-					return callback(new Error('failed to pack map textures'));
-			});
+				let quickpack = child_process.spawn('python', ['QuickPack.py', output_file], {cwd: bin_folder})
+				
+				if (noisy_logging) {
+					quickpack.stdout.on('data', function(data) {
+						console.log('stdout: ' + data);
+					});
+
+					quickpack.stderr.on('data', function(data) {
+						console.log('stderr: ' + data);
+					});
+				}
+
+				quickpack.on('close', code => {
+					if (code !== 0)
+						return callback(new Error('quickpack failed'));
+				});
+			}
 
 			console.log(`compressing '${output_filename}' for fastdl..`);
 
@@ -220,6 +238,7 @@ var bspsync = async.queue((task, callback) => {
 						});
 					});
 				});
+				return callback(false);
 			});
 
 			// Update metadata and write back.
