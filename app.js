@@ -238,7 +238,6 @@ var bspsync = async.queue((task, callback) => {
 						});
 					});
 				});
-				return callback(false);
 			});
 
 			// Update metadata and write back.
