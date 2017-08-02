@@ -168,77 +168,77 @@ var bspsync = async.queue((task, callback) => {
 				quickpack.on('close', code => {
 					if (code !== 0)
 						return callback(new Error('quickpack failed'));
-				});
-			}
 
-			console.log(`compressing '${output_filename}' for fastdl..`);
+					console.log(`compressing '${output_filename}' for fastdl..`);
 
-			child_process.spawn(bin_folder.concat('bzip2.exe'), ['-z9', '-k', output_file], {cwd: bin_folder}).on('close', code => {
-				if (code !== 0)
-					return callback(new Error('failed to compress map.'));
-
-				// Build the arguments for invoking pscp.
-				let pscp_arguments = ['-batch', '-P', output_server.port, '-q', '-hostkey', output_server.hostkey];
-
-				if (output_server.password.length)
-					pscp_arguments.push('-pw', output_server.password);
-
-				if (output_server.private_key.filename.length)
-					pscp_arguments.push('-i', output_server.private_key.filename);
-
-				pscp_arguments.push(output_file + '.bz2', `${output_server.username}@${output_server.address}:${output_server.paths.fastdl}`);
-
-				// Upload the compressed map to the FastDL location with pscp.
-				let pscp = child_process.spawn(bin_folder.concat('pscp.exe'), pscp_arguments, {cwd: bin_folder});
-
-				console.log(`uploading '${output_filename}.bz2' to remote server..`);
-
-				pscp.on('close', code => {
-					if (code !== 0)
-						return callback(new Error('failed to upload compressed map file to server.'));
-
-					// Build the arguments for invoking plink.
-					let plink_arguments = ['-ssh', '-batch', '-P', output_server.port, '-hostkey', output_server.hostkey];
-
-					if (output_server.password.length)
-						plink_arguments.push('-pw', output_server.password);
-
-					if (output_server.private_key.filename.length)
-						plink_arguments.push('-i', output_server.private_key.filename);
-
-					plink_arguments.push(`${output_server.username}@${output_server.address}`);
-					plink_arguments.push(`bunzip2 -k -c "${output_server.paths.fastdl}/${output_basename}.bsp.bz2" > "${output_server.paths.maps}/${output_basename}.bsp"`);
-
-					// Run 'bunzip2' on the server to avoid uploading the map twice.
-					let plink = child_process.spawn(bin_folder.concat('plink.exe'), plink_arguments, {cwd: bin_folder});
-
-					console.log(`remotely extracting '${output_filename}.bz2' to game server..`);
-
-					plink.on('close', code => {
+					child_process.spawn(bin_folder.concat('bzip2.exe'), ['-z9', '-k', output_file], {cwd: bin_folder}).on('close', code => {
 						if (code !== 0)
-							return callback(new Error('failed to extract map to game server directory.'));
+							return callback(new Error('failed to compress map.'));
 
-						if (!output_server.rcon.enabled)
-							return callback(false);
+						// Build the arguments for invoking pscp.
+						let pscp_arguments = ['-batch', '-P', output_server.port, '-q', '-hostkey', output_server.hostkey];
 
-						let srcds_rcon = rcon({
-							address: output_server.rcon.address,
-							password: output_server.rcon.password
-						});
+						if (output_server.password.length)
+							pscp_arguments.push('-pw', output_server.password);
 
-						// Run 'changelevel' on the configured game server.
-						console.log('changing level on remote game server..');
+						if (output_server.private_key.filename.length)
+							pscp_arguments.push('-i', output_server.private_key.filename);
 
-						srcds_rcon.connect().then(() => {
-							return srcds_rcon.command(`changelevel ${output_basename}`).then(() => {
-								return callback(false);
+						pscp_arguments.push(output_file + '.bz2', `${output_server.username}@${output_server.address}:${output_server.paths.fastdl}`);
+
+						// Upload the compressed map to the FastDL location with pscp.
+						let pscp = child_process.spawn(bin_folder.concat('pscp.exe'), pscp_arguments, {cwd: bin_folder});
+
+						console.log(`uploading '${output_filename}.bz2' to remote server..`);
+
+						pscp.on('close', code => {
+							if (code !== 0)
+								return callback(new Error('failed to upload compressed map file to server.'));
+
+							// Build the arguments for invoking plink.
+							let plink_arguments = ['-ssh', '-batch', '-P', output_server.port, '-hostkey', output_server.hostkey];
+
+							if (output_server.password.length)
+								plink_arguments.push('-pw', output_server.password);
+
+							if (output_server.private_key.filename.length)
+								plink_arguments.push('-i', output_server.private_key.filename);
+
+							plink_arguments.push(`${output_server.username}@${output_server.address}`);
+							plink_arguments.push(`bunzip2 -k -c "${output_server.paths.fastdl}/${output_basename}.bsp.bz2" > "${output_server.paths.maps}/${output_basename}.bsp"`);
+
+							// Run 'bunzip2' on the server to avoid uploading the map twice.
+							let plink = child_process.spawn(bin_folder.concat('plink.exe'), plink_arguments, {cwd: bin_folder});
+
+							console.log(`remotely extracting '${output_filename}.bz2' to game server..`);
+
+							plink.on('close', code => {
+								if (code !== 0)
+									return callback(new Error('failed to extract map to game server directory.'));
+
+								if (!output_server.rcon.enabled)
+									return callback(false);
+
+								let srcds_rcon = rcon({
+									address: output_server.rcon.address,
+									password: output_server.rcon.password
+								});
+
+								// Run 'changelevel' on the configured game server.
+								console.log('changing level on remote game server..');
+
+								srcds_rcon.connect().then(() => {
+									return srcds_rcon.command(`changelevel ${output_basename}`).then(() => {
+										return callback(false);
+									});
+								}).catch(error => {
+									return callback(new Error('failed to changelevel on remote game server'));
+								});
 							});
-						}).catch(error => {
-							return callback(new Error('failed to changelevel on remote game server'));
 						});
 					});
 				});
-			});
+			}
 
 			// Update metadata and write back.
 			watch_file.last_version = version;
